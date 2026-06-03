@@ -6,7 +6,8 @@ import random
 # SUPABASE BAĞLANTI
 # =====================
 SUPABASE_URL = "https://ujribeeceqryqowkvlmh.supabase.co"
-SUPABASE_KEY = "BURAYA_ANON_KEY"
+
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcmliZWVjZXFyeXFvd2t2bG1oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0ODM3NzMsImV4cCI6MjA5NjA1OTc3M30.rowgU9bAJPdz6-aSpwUMUEWarsM3B-WKV_K75t-NVZA"
 
 if SUPABASE_URL == "" or SUPABASE_KEY == "" or "BURAYA" in SUPABASE_KEY:
     st.error("Supabase ayarları eksik!")
