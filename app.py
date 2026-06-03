@@ -7,19 +7,35 @@ import pandas as pd
 # SUPABASE
 # =========================
 SUPABASE_URL = "https://ujribeeceqryqowkvlmh.supabase.co"
-SUPABASE_KEY = "BURAYA_ANON_KEY"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcmliZWVjZXFyeXFvd2t2bG1oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0ODM3NzMsImV4cCI6MjA5NjA1OTc3M30.rowgU9bAJPdz6-aSpwUMUEWarsM3B-WKV_K75t-NVZA"
 
 db = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.set_page_config(page_title="Barkod Panel", layout="wide")
 
 # =========================
-# LOGIN
+# LOGIN STATE
 # =========================
 if "user" not in st.session_state:
     st.session_state.user = None
 
+if "page" not in st.session_state:
+    st.session_state.page = "login"
+
+if "temp" not in st.session_state:
+    st.session_state.temp = []
+
+# =========================
+# BARCODE GEN
+# =========================
+def gen_barcode():
+    return "278294" + str(random.randint(10000, 99999))
+
+# =========================
+# LOGIN
+# =========================
 if not st.session_state.user:
+
     st.title("🔐 Giriş")
 
     u = st.text_input("Kullanıcı")
@@ -28,13 +44,13 @@ if not st.session_state.user:
     if st.button("Giriş"):
         users = db.table("users").select("*").execute().data
 
-        match = None
+        found = None
         for x in users:
             if x["username"] == u and x["password"] == p:
-                match = x
+                found = x
 
-        if match:
-            st.session_state.user = match
+        if found:
+            st.session_state.user = found
             st.rerun()
         else:
             st.error("Hatalı giriş")
@@ -44,24 +60,9 @@ if not st.session_state.user:
 user = st.session_state.user
 
 # =========================
-# STATE
-# =========================
-if "page" not in st.session_state:
-    st.session_state.page = "create"
-
-if "temp_list" not in st.session_state:
-    st.session_state.temp_list = []
-
-# =========================
-# BARCODE
-# =========================
-def generate_barcode():
-    return "278294" + str(random.randint(10000, 99999))
-
-# =========================
 # SIDEBAR
 # =========================
-st.sidebar.title("📦 MENÜ")
+st.sidebar.title("📦 PANEL")
 
 if st.sidebar.button("➕ Barkod Oluştur"):
     st.session_state.page = "create"
@@ -72,28 +73,32 @@ if st.sidebar.button("📥 Import"):
 if st.sidebar.button("📋 Barkodlar"):
     st.session_state.page = "list"
 
+if st.sidebar.button("🚪 Çıkış"):
+    st.session_state.user = None
+    st.rerun()
+
 # =========================
 # PAGE: CREATE
 # =========================
 if st.session_state.page == "create":
+
     st.title("➕ Barkod Oluştur")
 
-    # --- ŞUBE AUTOCOMPLETE ---
+    # SHUBELER
     branches = db.table("branches").select("*").execute().data
     branch_names = [b["name"] for b in branches]
 
-    q = st.text_input("Şube adı / kod yaz")
+    q = st.text_input("Şube ara")
 
     filtered = [b for b in branch_names if q.lower() in b.lower()] if q else branch_names
 
-    branch = st.selectbox("Şube seç", filtered if filtered else branch_names)
+    branch = st.selectbox("Şube", filtered if filtered else branch_names)
 
-    # --- ÜRÜN ---
     product = st.text_input("Ürün içeriği")
 
-    # ürün auto
     w = h = l = weight = ""
 
+    # PRODUCT AUTO
     if product:
         products = db.table("products").select("*").execute().data
 
@@ -115,10 +120,9 @@ if st.session_state.page == "create":
     with col4:
         weight = st.text_input("Ağırlık", value=weight)
 
-    # --- KUTU EKLE ---
     if st.button("➕ Kutu Ekle"):
-        st.session_state.temp_list.append({
-            "barcode": generate_barcode(),
+        st.session_state.temp.append({
+            "barcode": gen_barcode(),
             "branch_name": branch,
             "product": product,
             "w": w,
@@ -129,39 +133,26 @@ if st.session_state.page == "create":
             "created_by": user["username"]
         })
 
-        st.success("Eklendi")
-
-    # --- GEÇİCİ LİSTE ---
     st.markdown("### 📦 Bekleyenler")
 
-    for i, x in enumerate(st.session_state.temp_list):
-        st.write(i+1, x["branch_name"], x["product"], x["barcode"])
+    for i, t in enumerate(st.session_state.temp):
+        st.write(i+1, t["branch_name"], t["product"], t["barcode"])
 
-    # --- KAYDET ---
     if st.button("💾 Kaydet"):
-        for item in st.session_state.temp_list:
-            db.table("barcodes").insert({
-                "barcode": item["barcode"],
-                "branch_name": item["branch_name"],
-                "product": item["product"],
-                "w": item["w"],
-                "h": item["h"],
-                "l": item["l"],
-                "weight": item["weight"],
-                "status": "waiting",
-                "created_by": item["created_by"]
-            }).execute()
+        for t in st.session_state.temp:
+            db.table("barcodes").insert(t).execute()
 
-        st.session_state.temp_list = []
+        st.session_state.temp = []
         st.success("Kaydedildi")
 
 # =========================
 # PAGE: IMPORT
 # =========================
 if st.session_state.page == "import":
+
     st.title("📥 Import")
 
-    file = st.file_uploader("Excel yükle", type=["xlsx"])
+    file = st.file_uploader("Excel", type=["xlsx"])
 
     if file:
         df = pd.read_excel(file)
@@ -170,7 +161,7 @@ if st.session_state.page == "import":
         if st.button("Aktar"):
             for _, r in df.iterrows():
                 db.table("barcodes").insert({
-                    "barcode": generate_barcode(),
+                    "barcode": gen_barcode(),
                     "branch_name": r.get("branch_name", ""),
                     "product": r.get("product", ""),
                     "status": "waiting",
@@ -183,9 +174,15 @@ if st.session_state.page == "import":
 # PAGE: LIST
 # =========================
 if st.session_state.page == "list":
+
     st.title("📋 Barkodlar")
 
     data = db.table("barcodes").select("*").execute().data
 
     for d in data:
-        st.write(d["barcode"], d["branch_name"], d["product"], d["status"])
+        st.write(
+            d.get("barcode"),
+            d.get("branch_name"),
+            d.get("product"),
+            d.get("status")
+        )
