@@ -4,10 +4,16 @@ import random
 import pandas as pd
 import io
 
+# =====================
+# REPORTLAB (DOĞRU IMPORT)
+# =====================
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import cm
+from reportlab.lib.units import cm
 from reportlab.lib.utils import ImageReader
 
+# =====================
+# BARCODE
+# =====================
 from barcode import Code128
 from barcode.writer import ImageWriter
 
@@ -19,7 +25,7 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 db = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-st.set_page_config(page_title="Barkod Panel", layout="wide")
+st.set_page_config(page_title="Barkod Sistem", layout="wide")
 
 # =====================
 # STATE
@@ -89,6 +95,7 @@ if not st.session_state.user:
 
     if st.button("Giriş"):
         users = safe("users")
+
         user = next((x for x in users if x.get("username")==u and x.get("password")==p), None)
 
         if user:
@@ -178,11 +185,11 @@ if st.session_state.page == "create":
             except:
                 pass
 
-        st.session_state.basket = []
-        st.success("Kaydedildi")
-
         pdf = create_pdf(st.session_state.basket)
         st.download_button("PDF İndir", pdf, file_name="barkod.pdf", mime="application/pdf")
+
+        st.session_state.basket = []
+        st.success("Kaydedildi")
 
 # =====================
 # BRANCHES
