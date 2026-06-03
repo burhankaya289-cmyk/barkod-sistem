@@ -2,14 +2,23 @@ import streamlit as st
 from supabase import create_client
 import random
 
-SUPABASE_URL = "BURAYA_SUPABASE_URL"
-SUPABASE_KEY = "BURAYA_SUPABASE_KEY"
+# =====================
+# SUPABASE BAĞLANTI
+# =====================
+SUPABASE_URL = "https://ujribeeceqryqowkvlmh.supabase.co"
+SUPABASE_KEY = "BURAYA_ANON_KEY"
+
+if SUPABASE_URL == "" or SUPABASE_KEY == "" or "BURAYA" in SUPABASE_KEY:
+    st.error("Supabase ayarları eksik!")
+    st.stop()
 
 db = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.set_page_config(layout="wide")
 
+# =====================
 # LOGIN
+# =====================
 if "user" not in st.session_state:
     st.session_state.user = None
 
@@ -20,16 +29,23 @@ if not st.session_state.user:
     p = st.text_input("Şifre", type="password")
 
     if st.button("Giriş"):
-        res = db.table("users").select("*").eq("username", u).eq("password", p).execute()
-
-        if res.data:
-            st.session_state.user = res.data[0]
-            st.rerun()
+        try:
+            res = db.table("users").select("*").eq("username", u).eq("password", p).execute()
+            if res.data:
+                st.session_state.user = res.data[0]
+                st.rerun()
+            else:
+                st.error("Hatalı giriş")
+        except Exception as e:
+            st.error(f"DB hata: {e}")
 
     st.stop()
 
 user = st.session_state.user
 
+# =====================
+# MENU
+# =====================
 menu = st.sidebar.selectbox("Menü", [
     "Barkod Oluştur",
     "Barkodlar",
@@ -37,11 +53,17 @@ menu = st.sidebar.selectbox("Menü", [
     "Ürünler"
 ])
 
+# =====================
+# BARKOD OLUŞTUR
+# =====================
 if menu == "Barkod Oluştur":
     st.title("Barkod Oluştur")
 
-    branches = db.table("branches").select("*").execute().data
-    branch_names = [b["name"] for b in branches] if branches else []
+    try:
+        branches = db.table("branches").select("*").execute().data
+        branch_names = [b["name"] for b in branches] if branches else []
+    except:
+        branch_names = []
 
     branch = st.selectbox("Şube", branch_names) if branch_names else st.text_input("Şube")
     product = st.text_input("Ürün")
@@ -59,14 +81,22 @@ if menu == "Barkod Oluştur":
 
         st.success("Barkod oluşturuldu")
 
+# =====================
+# BARKOD LİSTE
+# =====================
 if menu == "Barkodlar":
     st.title("Barkodlar")
 
-    data = db.table("barcodes").select("*").execute().data
+    try:
+        data = db.table("barcodes").select("*").execute().data
+        for d in data:
+            st.write(d["branch_name"], d["product"], d["barcode"], d["status"])
+    except Exception as e:
+        st.error(f"Hata: {e}")
 
-    for d in data:
-        st.write(d["branch_name"], d["product"], d["barcode"], d["status"])
-
+# =====================
+# ŞUBE
+# =====================
 if menu == "Şubeler":
     st.title("Şube Ekle")
 
@@ -80,9 +110,11 @@ if menu == "Şubeler":
             "name": name,
             "address": address
         }).execute()
-
         st.success("Şube eklendi")
 
+# =====================
+# ÜRÜN
+# =====================
 if menu == "Ürünler":
     st.title("Ürün Ekle")
 
