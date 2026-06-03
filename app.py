@@ -4,16 +4,10 @@ import random
 import pandas as pd
 import io
 
-# =====================
-# REPORTLAB (DOĞRU IMPORT)
-# =====================
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
 from reportlab.lib.utils import ImageReader
 
-# =====================
-# BARCODE
-# =====================
 from barcode import Code128
 from barcode.writer import ImageWriter
 
@@ -25,7 +19,43 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 db = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-st.set_page_config(page_title="Barkod Sistem", layout="wide")
+st.set_page_config(page_title="Barkod SaaS", layout="wide")
+
+# =====================
+# SAAS UI THEME
+# =====================
+st.markdown("""
+<style>
+.main { background-color:#0b1220; color:#e5e7eb; }
+
+section[data-testid="stSidebar"] {
+    background-color:#0f172a;
+}
+
+.stButton>button {
+    background:linear-gradient(135deg,#3b82f6,#2563eb);
+    color:white;
+    border-radius:10px;
+    height:42px;
+    font-weight:600;
+    border:none;
+}
+
+.stTextInput>div>div>input,
+.stSelectbox>div>div>div {
+    background-color:#111827;
+    color:white;
+}
+
+.card {
+    background:#111827;
+    padding:12px;
+    border-radius:12px;
+    border:1px solid #1f2937;
+    margin-bottom:10px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # =====================
 # STATE
@@ -34,7 +64,7 @@ if "user" not in st.session_state:
     st.session_state.user = None
 
 if "page" not in st.session_state:
-    st.session_state.page = "login"
+    st.session_state.page = "dashboard"
 
 if "basket" not in st.session_state:
     st.session_state.basket = []
@@ -45,35 +75,32 @@ if "basket" not in st.session_state:
 def gen_barcode():
     return "278294" + str(random.randint(10000, 99999))
 
-def safe(table):
+def safe(t):
     try:
-        return db.table(table).select("*").execute().data
+        return db.table(t).select("*").execute().data
     except:
         return []
 
-def create_barcode_image(text):
-    barcode = Code128(text, writer=ImageWriter())
-    path = f"/tmp/{text}"
-    return barcode.save(path)
+def make_barcode_img(text):
+    b = Code128(text, writer=ImageWriter())
+    return b.save(f"/tmp/{text}")
 
 def create_pdf(items):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=(10*cm, 15*cm))
 
-    for item in items:
-
+    for i in items:
         c.setFont("Helvetica-Bold", 10)
-        c.drawString(10, 420, f"BARKOD: {item['barcode']}")
+        c.drawString(10, 420, f"BARKOD: {i['barcode']}")
 
         c.setFont("Helvetica", 9)
-        c.drawString(10, 400, f"ŞUBE: {item.get('branch','')}")
-        c.drawString(10, 385, f"ÜRÜN: {item.get('product','')}")
-        c.drawString(10, 370, f"ÖLÇÜ: {item.get('w','')}x{item.get('h','')}x{item.get('l','')}")
-        c.drawString(10, 355, f"AĞIRLIK: {item.get('weight','')}")
+        c.drawString(10, 400, f"ŞUBE: {i.get('branch','')}")
+        c.drawString(10, 385, f"ÜRÜN: {i.get('product','')}")
+        c.drawString(10, 370, f"ÖLÇÜ: {i.get('w','')}x{i.get('h','')}x{i.get('l','')}")
+        c.drawString(10, 355, f"AĞIRLIK: {i.get('weight','')}")
 
         try:
-            img_path = create_barcode_image(item["barcode"])
-            img = ImageReader(img_path)
+            img = ImageReader(make_barcode_img(i["barcode"]))
             c.drawImage(img, 10, 220, width=250, height=80)
         except:
             pass
@@ -88,14 +115,13 @@ def create_pdf(items):
 # LOGIN
 # =====================
 if not st.session_state.user:
-    st.title("🔐 Giriş")
+    st.title("🚀 Barkod SaaS Login")
 
     u = st.text_input("Kullanıcı")
     p = st.text_input("Şifre", type="password")
 
     if st.button("Giriş"):
         users = safe("users")
-
         user = next((x for x in users if x.get("username")==u and x.get("password")==p), None)
 
         if user:
@@ -109,31 +135,57 @@ if not st.session_state.user:
 user = st.session_state.user
 
 # =====================
-# SIDEBAR
+# SIDEBAR (SAAS MENU)
 # =====================
-st.sidebar.title("📦 PANEL")
+st.sidebar.markdown("### 🚀 Barkod SaaS")
+st.sidebar.markdown("---")
 
-if st.sidebar.button("Barkod"):
-    st.session_state.page = "create"
+pages = {
+    "📊 Dashboard": "dashboard",
+    "➕ Barkod": "create",
+    "🏢 Şubeler": "branches",
+    "📦 Ürünler": "products",
+    "📋 Barkodlar": "list",
+    "📥 Import": "import"
+}
 
-if st.sidebar.button("Şubeler"):
-    st.session_state.page = "branches"
+for k,v in pages.items():
+    if st.sidebar.button(k):
+        st.session_state.page = v
 
-if st.sidebar.button("Ürünler"):
-    st.session_state.page = "products"
-
-if st.sidebar.button("Barkodlar"):
-    st.session_state.page = "list"
-
-if st.sidebar.button("Import"):
-    st.session_state.page = "import"
-
-if st.sidebar.button("Çıkış"):
+if st.sidebar.button("🚪 Çıkış"):
     st.session_state.user = None
     st.rerun()
 
 # =====================
-# CREATE
+# DASHBOARD
+# =====================
+if st.session_state.page == "dashboard":
+    st.title("📊 Dashboard")
+
+    barcodes = safe("barcodes")
+    branches = safe("branches")
+    products = safe("products")
+
+    col1,col2,col3 = st.columns(3)
+
+    col1.metric("Toplam Barkod", len(barcodes))
+    col2.metric("Şube", len(branches))
+    col3.metric("Ürün", len(products))
+
+    st.write("### Son Barkodlar")
+
+    for b in barcodes[-5:]:
+        st.markdown(f"""
+        <div class="card">
+            📦 {b.get('barcode')}<br>
+            🏢 {b.get('branch')}<br>
+            📌 {b.get('status')}
+        </div>
+        """, unsafe_allow_html=True)
+
+# =====================
+# CREATE BARKOD
 # =====================
 if st.session_state.page == "create":
     st.title("➕ Barkod Oluştur")
@@ -143,7 +195,10 @@ if st.session_state.page == "create":
 
     branch_names = [b.get("name","") for b in branches]
 
-    branch = st.selectbox("Şube", branch_names)
+    branch_input = st.text_input("Şube yaz")
+
+    filtered = [b for b in branch_names if branch_input.lower() in b.lower()] if branch_input else branch_names
+    branch = st.selectbox("Şube", filtered if filtered else branch_names)
 
     product = st.text_input("Ürün")
 
@@ -152,7 +207,7 @@ if st.session_state.page == "create":
     if product:
         match = next((p for p in products if p.get("name","").lower()==product.lower()), None)
         if match:
-            w, h, l, weight = match.get("w",""), match.get("h",""), match.get("l",""), match.get("weight","")
+            w,h,l,weight = match.get("w",""),match.get("h",""),match.get("l",""),match.get("weight","")
 
     c1,c2,c3,c4 = st.columns(4)
     with c1: w = st.text_input("En", value=w)
@@ -173,12 +228,18 @@ if st.session_state.page == "create":
             "user": user["username"]
         })
 
-    st.write("## Sepet")
+    st.write("### Sepet")
 
     for i,b in enumerate(st.session_state.basket):
-        st.write(i+1, b["barcode"], b["branch"], b["product"])
+        st.markdown(f"""
+        <div class="card">
+            📦 {b['barcode']}<br>
+            🏢 {b['branch']}<br>
+            📌 {b['product']}
+        </div>
+        """, unsafe_allow_html=True)
 
-    if st.button("💾 Kaydet"):
+    if st.button("💾 Kaydet + PDF"):
         for b in st.session_state.basket:
             try:
                 db.table("barcodes").insert(b).execute()
@@ -186,7 +247,13 @@ if st.session_state.page == "create":
                 pass
 
         pdf = create_pdf(st.session_state.basket)
-        st.download_button("PDF İndir", pdf, file_name="barkod.pdf", mime="application/pdf")
+
+        st.download_button(
+            "🖨 PDF İndir",
+            pdf,
+            file_name="barkodlar.pdf",
+            mime="application/pdf"
+        )
 
         st.session_state.basket = []
         st.success("Kaydedildi")
@@ -197,7 +264,7 @@ if st.session_state.page == "create":
 if st.session_state.page == "branches":
     st.title("🏢 Şubeler")
 
-    name = st.text_input("Şube")
+    name = st.text_input("Şube adı")
     code = st.text_input("Kod")
     address = st.text_input("Adres")
 
@@ -209,7 +276,7 @@ if st.session_state.page == "branches":
         }).execute()
 
     for b in safe("branches"):
-        st.write(b.get("name"), b.get("code"), b.get("address"))
+        st.markdown(f"<div class='card'>🏢 {b.get('name')} - {b.get('code')}</div>", unsafe_allow_html=True)
 
 # =====================
 # PRODUCTS
@@ -233,10 +300,10 @@ if st.session_state.page == "products":
         }).execute()
 
     for p in safe("products"):
-        st.write(p.get("name"), p.get("w"), p.get("h"), p.get("l"))
+        st.markdown(f"<div class='card'>📦 {p.get('name')}</div>", unsafe_allow_html=True)
 
 # =====================
-# LIST
+# LIST + PRINT
 # =====================
 if st.session_state.page == "list":
     st.title("📋 Barkodlar")
@@ -246,30 +313,22 @@ if st.session_state.page == "list":
     selected = []
 
     for i,b in enumerate(data):
-        col1,col2,col3,col4 = st.columns([1,3,3,2])
+        col1,col2,col3 = st.columns([1,4,2])
 
         with col1:
             if st.checkbox("", key=i):
                 selected.append(b)
 
         with col2:
-            st.write(b.get("barcode"))
+            st.markdown(f"<div class='card'>📦 {b.get('barcode')} - {b.get('branch')}</div>", unsafe_allow_html=True)
 
         with col3:
-            st.write(b.get("branch"))
-
-        with col4:
             st.write("🟢" if b.get("status")=="waiting" else "🔴")
 
     if selected:
         pdf = create_pdf(selected)
 
-        st.download_button(
-            "🖨 PDF İndir",
-            pdf,
-            file_name="barkodlar.pdf",
-            mime="application/pdf"
-        )
+        st.download_button("🖨 PDF İndir", pdf, file_name="barkodlar.pdf", mime="application/pdf")
 
     if st.button("✔ Yazdırıldı"):
         for s in selected:
@@ -300,4 +359,4 @@ if st.session_state.page == "import":
                     "user": user["username"]
                 }).execute()
 
-            st.success("Tamam")
+            st.success("Bitti")
