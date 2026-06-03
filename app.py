@@ -1,23 +1,21 @@
-st.write(db.table("users").select("*").execute())
-st.stop()
 import streamlit as st
 from supabase import create_client
 import random
 import pandas as pd
 
-# =======================
+# =========================
 # SUPABASE
-# =======================
+# =========================
 SUPABASE_URL = "https://ujribeeceqryqowkvlmh.supabase.co"
-SUPABASE_KEY = "BURAYA_ANON_KEY"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcmliZWVjZXFyeXFvd2t2bG1oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0ODM3NzMsImV4cCI6MjA5NjA1OTc3M30.rowgU9bAJPdz6-aSpwUMUEWarsM3B-WKV_K75t-NVZA"
 
 db = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.set_page_config(page_title="Barkod Sistem", layout="wide")
 
-# =======================
+# =========================
 # STATE
-# =======================
+# =========================
 if "user" not in st.session_state:
     st.session_state.user = None
 
@@ -27,15 +25,15 @@ if "page" not in st.session_state:
 if "temp_barcodes" not in st.session_state:
     st.session_state.temp_barcodes = []
 
-# =======================
-# BARCODE
-# =======================
+# =========================
+# BARCODE GEN
+# =========================
 def gen_barcode():
     return "278294" + str(random.randint(10000, 99999))
 
-# =======================
+# =========================
 # LOGIN
-# =======================
+# =========================
 if not st.session_state.user:
     st.title("🔐 Giriş")
 
@@ -45,8 +43,8 @@ if not st.session_state.user:
     if st.button("Giriş"):
         try:
             users = db.table("users").select("*").execute().data
-        except:
-            st.error("Supabase users tablosu okunamadı (RLS / tablo kontrol et)")
+        except Exception as e:
+            st.error(f"Users okunamadı: {e}")
             st.stop()
 
         found = None
@@ -64,12 +62,12 @@ if not st.session_state.user:
 
 user = st.session_state.user
 
-# =======================
+# =========================
 # SIDEBAR
-# =======================
+# =========================
 st.sidebar.title("📦 MENÜ")
 
-if st.sidebar.button("➕ Barkod"):
+if st.sidebar.button("➕ Barkod Oluştur"):
     st.session_state.page = "create"
 
 if st.sidebar.button("🏢 Şubeler"):
@@ -78,7 +76,7 @@ if st.sidebar.button("🏢 Şubeler"):
 if st.sidebar.button("📦 Ürünler"):
     st.session_state.page = "products"
 
-if st.sidebar.button("📋 Liste"):
+if st.sidebar.button("📋 Barkodlar"):
     st.session_state.page = "list"
 
 if st.sidebar.button("📥 Import"):
@@ -88,13 +86,12 @@ if st.sidebar.button("🚪 Çıkış"):
     st.session_state.user = None
     st.rerun()
 
-# =======================
+# =========================
 # PAGE: CREATE
-# =======================
+# =========================
 if st.session_state.page == "create":
     st.title("➕ Barkod Oluştur")
 
-    # SHUBELER
     try:
         branches = db.table("branches").select("*").execute().data
     except:
@@ -108,7 +105,6 @@ if st.session_state.page == "create":
 
     branch = st.selectbox("Şube", filtered if filtered else branch_names)
 
-    # ÜRÜN
     product = st.text_input("Ürün içeriği")
 
     w = h = l = weight = ""
@@ -160,14 +156,14 @@ if st.session_state.page == "create":
             try:
                 db.table("barcodes").insert(t).execute()
             except Exception as e:
-                st.error(f"Hata: {e}")
+                st.error(e)
 
         st.session_state.temp_barcodes = []
         st.success("Kaydedildi")
 
-# =======================
+# =========================
 # PAGE: BRANCHES
-# =======================
+# =========================
 if st.session_state.page == "branches":
     st.title("🏢 Şubeler")
 
@@ -175,7 +171,7 @@ if st.session_state.page == "branches":
     name = st.text_input("Şube Adı")
     address = st.text_input("Adres")
 
-    if st.button("Şube Ekle"):
+    if st.button("Ekle"):
         db.table("branches").insert({
             "code": code,
             "name": name,
@@ -193,9 +189,9 @@ if st.session_state.page == "branches":
     for b in branches:
         st.write(b.get("code"), b.get("name"), b.get("address"))
 
-# =======================
+# =========================
 # PAGE: PRODUCTS
-# =======================
+# =========================
 if st.session_state.page == "products":
     st.title("📦 Ürünler")
 
@@ -205,7 +201,7 @@ if st.session_state.page == "products":
     l = st.text_input("Yükseklik")
     weight = st.text_input("Ağırlık")
 
-    if st.button("Ürün Ekle"):
+    if st.button("Ekle"):
         db.table("products").insert({
             "name": name,
             "w": w,
@@ -225,9 +221,9 @@ if st.session_state.page == "products":
     for p in products:
         st.write(p.get("name"), p.get("w"), p.get("h"), p.get("l"), p.get("weight"))
 
-# =======================
+# =========================
 # PAGE: LIST
-# =======================
+# =========================
 if st.session_state.page == "list":
     st.title("📋 Barkodlar")
 
@@ -237,16 +233,11 @@ if st.session_state.page == "list":
         data = []
 
     for d in data:
-        st.write(
-            d.get("barcode"),
-            d.get("branch_name"),
-            d.get("product"),
-            d.get("status")
-        )
+        st.write(d.get("barcode"), d.get("branch_name"), d.get("product"), d.get("status"))
 
-# =======================
+# =========================
 # PAGE: IMPORT
-# =======================
+# =========================
 if st.session_state.page == "import":
     st.title("📥 Import")
 
