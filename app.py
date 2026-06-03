@@ -15,21 +15,24 @@ from barcode.writer import ImageWriter
 # SUPABASE
 # =====================
 SUPABASE_URL = "https://ujribeeceqryqowkvlmh.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqcmliZWVjZXFyeXFvd2t2bG1oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0ODM3NzMsImV4cCI6MjA5NjA1OTc3M30.rowgU9bAJPdz6-aSpwUMUEWarsM3B-WKV_K75t-NVZA"
+SUPABASE_KEY = "BURAYA_ANON_KEY"
 
 db = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# =====================
+# PAGE CONFIG
+# =====================
 st.set_page_config(page_title="Barkod SaaS", layout="wide")
 
 # =====================
-# SAAS UI THEME
+# SAAS STYLE
 # =====================
 st.markdown("""
 <style>
-.main { background-color:#0b1220; color:#e5e7eb; }
+.main { background:#0b1220; color:#e5e7eb; }
 
 section[data-testid="stSidebar"] {
-    background-color:#0f172a;
+    background:#0f172a;
 }
 
 .stButton>button {
@@ -37,13 +40,12 @@ section[data-testid="stSidebar"] {
     color:white;
     border-radius:10px;
     height:42px;
-    font-weight:600;
     border:none;
+    font-weight:600;
 }
 
-.stTextInput>div>div>input,
-.stSelectbox>div>div>div {
-    background-color:#111827;
+.stTextInput input, .stSelectbox div {
+    background:#111827;
     color:white;
 }
 
@@ -70,21 +72,27 @@ if "basket" not in st.session_state:
     st.session_state.basket = []
 
 # =====================
-# HELPERS
+# SAFE DB
+# =====================
+def safe(table):
+    try:
+        return db.table(table).select("*").execute().data
+    except:
+        return []
+
+# =====================
+# BARCODE
 # =====================
 def gen_barcode():
     return "278294" + str(random.randint(10000, 99999))
 
-def safe(t):
-    try:
-        return db.table(t).select("*").execute().data
-    except:
-        return []
-
-def make_barcode_img(text):
+def make_barcode(text):
     b = Code128(text, writer=ImageWriter())
     return b.save(f"/tmp/{text}")
 
+# =====================
+# PDF
+# =====================
 def create_pdf(items):
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=(10*cm, 15*cm))
@@ -100,7 +108,7 @@ def create_pdf(items):
         c.drawString(10, 355, f"AĞIRLIK: {i.get('weight','')}")
 
         try:
-            img = ImageReader(make_barcode_img(i["barcode"]))
+            img = ImageReader(make_barcode(i["barcode"]))
             c.drawImage(img, 10, 220, width=250, height=80)
         except:
             pass
@@ -112,7 +120,7 @@ def create_pdf(items):
     return buffer
 
 # =====================
-# LOGIN
+# LOGIN (basit)
 # =====================
 if not st.session_state.user:
     st.title("🚀 Barkod SaaS Login")
@@ -135,17 +143,16 @@ if not st.session_state.user:
 user = st.session_state.user
 
 # =====================
-# SIDEBAR (SAAS MENU)
+# SIDEBAR
 # =====================
 st.sidebar.markdown("### 🚀 Barkod SaaS")
-st.sidebar.markdown("---")
 
 pages = {
     "📊 Dashboard": "dashboard",
     "➕ Barkod": "create",
+    "📋 Liste": "list",
     "🏢 Şubeler": "branches",
     "📦 Ürünler": "products",
-    "📋 Barkodlar": "list",
     "📥 Import": "import"
 }
 
@@ -153,7 +160,7 @@ for k,v in pages.items():
     if st.sidebar.button(k):
         st.session_state.page = v
 
-if st.sidebar.button("🚪 Çıkış"):
+if st.sidebar.button("Çıkış"):
     st.session_state.user = None
     st.rerun()
 
@@ -169,11 +176,11 @@ if st.session_state.page == "dashboard":
 
     col1,col2,col3 = st.columns(3)
 
-    col1.metric("Toplam Barkod", len(barcodes))
+    col1.metric("Barkod", len(barcodes))
     col2.metric("Şube", len(branches))
     col3.metric("Ürün", len(products))
 
-    st.write("### Son Barkodlar")
+    st.write("### Son Kayıtlar")
 
     for b in barcodes[-5:]:
         st.markdown(f"""
@@ -185,7 +192,7 @@ if st.session_state.page == "dashboard":
         """, unsafe_allow_html=True)
 
 # =====================
-# CREATE BARKOD
+# CREATE
 # =====================
 if st.session_state.page == "create":
     st.title("➕ Barkod Oluştur")
@@ -215,7 +222,7 @@ if st.session_state.page == "create":
     with c3: l = st.text_input("Yükseklik", value=l)
     with c4: weight = st.text_input("Ağırlık", value=weight)
 
-    if st.button("➕ Ekle"):
+    if st.button("Ekle"):
         st.session_state.basket.append({
             "barcode": gen_barcode(),
             "branch": branch,
@@ -230,7 +237,7 @@ if st.session_state.page == "create":
 
     st.write("### Sepet")
 
-    for i,b in enumerate(st.session_state.basket):
+    for b in st.session_state.basket:
         st.markdown(f"""
         <div class="card">
             📦 {b['barcode']}<br>
@@ -239,7 +246,7 @@ if st.session_state.page == "create":
         </div>
         """, unsafe_allow_html=True)
 
-    if st.button("💾 Kaydet + PDF"):
+    if st.button("Kaydet + PDF"):
         for b in st.session_state.basket:
             try:
                 db.table("barcodes").insert(b).execute()
@@ -248,62 +255,12 @@ if st.session_state.page == "create":
 
         pdf = create_pdf(st.session_state.basket)
 
-        st.download_button(
-            "🖨 PDF İndir",
-            pdf,
-            file_name="barkodlar.pdf",
-            mime="application/pdf"
-        )
+        st.download_button("PDF İndir", pdf, file_name="barkodlar.pdf", mime="application/pdf")
 
         st.session_state.basket = []
-        st.success("Kaydedildi")
 
 # =====================
-# BRANCHES
-# =====================
-if st.session_state.page == "branches":
-    st.title("🏢 Şubeler")
-
-    name = st.text_input("Şube adı")
-    code = st.text_input("Kod")
-    address = st.text_input("Adres")
-
-    if st.button("Ekle"):
-        db.table("branches").insert({
-            "name": name,
-            "code": code,
-            "address": address
-        }).execute()
-
-    for b in safe("branches"):
-        st.markdown(f"<div class='card'>🏢 {b.get('name')} - {b.get('code')}</div>", unsafe_allow_html=True)
-
-# =====================
-# PRODUCTS
-# =====================
-if st.session_state.page == "products":
-    st.title("📦 Ürünler")
-
-    name = st.text_input("Ürün")
-    w = st.text_input("En")
-    h = st.text_input("Boy")
-    l = st.text_input("Yükseklik")
-    weight = st.text_input("Ağırlık")
-
-    if st.button("Ekle"):
-        db.table("products").insert({
-            "name": name,
-            "w": w,
-            "h": h,
-            "l": l,
-            "weight": weight
-        }).execute()
-
-    for p in safe("products"):
-        st.markdown(f"<div class='card'>📦 {p.get('name')}</div>", unsafe_allow_html=True)
-
-# =====================
-# LIST + PRINT
+# LIST
 # =====================
 if st.session_state.page == "list":
     st.title("📋 Barkodlar")
@@ -320,7 +277,13 @@ if st.session_state.page == "list":
                 selected.append(b)
 
         with col2:
-            st.markdown(f"<div class='card'>📦 {b.get('barcode')} - {b.get('branch')}</div>", unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class="card">
+                📦 {b.get('barcode')}<br>
+                🏢 {b.get('branch')}<br>
+                📌 {b.get('status')}
+            </div>
+            """, unsafe_allow_html=True)
 
         with col3:
             st.write("🟢" if b.get("status")=="waiting" else "🔴")
@@ -328,14 +291,53 @@ if st.session_state.page == "list":
     if selected:
         pdf = create_pdf(selected)
 
-        st.download_button("🖨 PDF İndir", pdf, file_name="barkodlar.pdf", mime="application/pdf")
+        st.download_button("PDF İndir", pdf, file_name="barkodlar.pdf", mime="application/pdf")
 
-    if st.button("✔ Yazdırıldı"):
+    if st.button("Yazdırıldı"):
         for s in selected:
             try:
                 db.table("barcodes").update({"status":"printed"}).eq("barcode", s["barcode"]).execute()
             except:
                 pass
+
+# =====================
+# BRANCHES
+# =====================
+if st.session_state.page == "branches":
+    st.title("🏢 Şubeler")
+
+    name = st.text_input("Şube")
+    code = st.text_input("Kod")
+
+    if st.button("Ekle"):
+        db.table("branches").insert({"name":name,"code":code}).execute()
+
+    for b in safe("branches"):
+        st.write(b.get("name"), b.get("code"))
+
+# =====================
+# PRODUCTS
+# =====================
+if st.session_state.page == "products":
+    st.title("📦 Ürünler")
+
+    name = st.text_input("Ürün")
+    w = st.text_input("En")
+    h = st.text_input("Boy")
+    l = st.text_input("Yükseklik")
+    weight = st.text_input("Ağırlık")
+
+    if st.button("Ekle"):
+        db.table("products").insert({
+            "name":name,
+            "w":w,
+            "h":h,
+            "l":l,
+            "weight":weight
+        }).execute()
+
+    for p in safe("products"):
+        st.write(p.get("name"))
 
 # =====================
 # IMPORT
